@@ -41,7 +41,7 @@
 //
 let gTimeStep = 1.0 / 200.0;
 //
-let gDeformation = 1.2;
+let gDeformation = 0.2;
 let gGravity = 9.8;
 let gFriction = 0.9;
 let gDrag = 0.9;
@@ -128,8 +128,13 @@ class Mass {
      *    accel = (sum of the forces) / mass
      */
 
-    const gravityForce = new Vector3d(0.0, -gGravity * this.mass, 0.0); // TODO: is this the right basis?
-    const breezeForce = new Vector3d(0.0, 0.0, 0.0); // TODO
+    const gravityForce = new Vector3d(0.0, -gGravity * this.mass, 0.0);
+
+    // TODO: better breeze
+    const localBreezeConst = this.lastPosition
+      .minus(new Point3d(0.0, 0.0, 0.0))
+      .norm();
+    const breezeForce = new Vector3d(0.0, 0.0, localBreezeConst * gWind);
 
     const velocity = this.lastPosition.minus(this.secondLastPosition);
     const dragForce = velocity.times(-gDrag);
@@ -219,7 +224,31 @@ class Spring {
      * Move the positions of the two masses at the spring's ends so that
      * their distance apart is no more than `restingLength * gDeformation`.
      */
-    // WRITE THIS!
+
+    // TODO: do we need lastposition or position here? do we need to re-save the state?
+
+    // from mass 2, to mass 1
+    const distance = this.mass1.position.minus(this.mass2.position);
+    const adjustment = distance.norm() - gDeformation;
+    if (adjustment > 0) {
+      if (this.mass1.fixed) {
+        this.mass2.position = this.mass2.position.plus(
+          distance.unit().times(adjustment)
+        );
+      } else if (this.mass2.fixed) {
+        // need to move mass 2 closer to mass 1, so we need a minus sign
+        this.mass1.position = this.mass1.position.plus(
+          distance.unit().times(-adjustment)
+        );
+      } else {
+        this.mass1.position = this.mass1.position.plus(
+          distance.unit().times(-adjustment / 2)
+        );
+        this.mass2.position = this.mass2.position.plus(
+          distance.unit().times(adjustment / 2)
+        );
+      }
+    }
   }
 }
 
@@ -255,6 +284,10 @@ class Cloth {
     //
     this.getMass(0, 0).fixed = true;
     this.getMass(0, this.columns - 1).fixed = true;
+
+    // fix the other two corners too, I think it looks better
+    this.getMass(this.rows - 1, 0).fixed = true;
+    this.getMass(this.rows - 1, this.columns - 1).fixed = true;
   }
 
   reset() {
