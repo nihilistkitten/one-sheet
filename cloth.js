@@ -78,7 +78,6 @@ class Mass {
      */
     this.mass = mass0;
     this.position0 = position0;
-    this.velocity0 = new Vector3d(0.0, 0.0, 0.0);
     this.reset();
     //
     this.fixed = false; // Does the particle move?
@@ -100,9 +99,8 @@ class Mass {
      * You may need to reset your other simulation state.
      */
     this.position = this.position0;
-    this.velocity = this.velocity0;
     this.lastPosition = this.position0;
-    this.lastVelocity = this.velocity0;
+    this.secondLastPosition = this.position0;
     //
 
     // WRITE THIS!
@@ -114,7 +112,7 @@ class Mass {
      * velocity, before advancing it.
      */
     this.lastPosition = this.position;
-    this.lastVelocity = this.velocity;
+    this.secondLastPosition = this.lastPosition;
   }
 
   computeAcceleration() {
@@ -132,7 +130,9 @@ class Mass {
 
     const gravityForce = new Vector3d(0.0, -gGravity * this.mass, 0.0); // TODO: is this the right basis?
     const breezeForce = new Vector3d(0.0, 0.0, 0.0); // TODO
-    const dragForce = this.lastVelocity.times(-gDrag);
+
+    const velocity = this.lastPosition.minus(this.secondLastPosition);
+    const dragForce = velocity.times(-gDrag);
 
     const springForce = this.springs.reduce(
       (forces, spring) => forces.plus(spring.computeForce(this)),
@@ -153,8 +153,11 @@ class Mass {
      *
      * Use `timeStep` for the time step size.
      */
-    this.position = this.lastPosition.plus(this.lastVelocity.times(timeStep));
-    this.velocity = this.lastVelocity.plus(acceleration.times(timeStep));
+
+    const velocity = this.lastPosition.minus(this.secondLastPosition);
+    this.position = this.lastPosition
+      .plus(velocity.times(timeStep))
+      .plus(acceleration.times(timeStep * timeStep));
   }
 
   makeStep() {
@@ -203,12 +206,12 @@ class Spring {
      */
 
     const otherMass = onMass === this.mass1 ? this.mass2 : this.mass1;
-
-    const distance = onMass.lastPosition.minus(otherMass.lastPosition);
-
-    return distance
+    const distance = otherMass.lastPosition.minus(onMass.lastPosition);
+    const force = distance
       .unit()
       .times((distance.norm() - this.restingLength) * this.stiffness);
+
+    return force;
   }
 
   constrain() {
