@@ -101,6 +101,8 @@ class Mass {
      */
     this.position = this.position0;
     this.velocity = this.velocity0;
+    this.lastPosition = this.position0;
+    this.lastVelocity = this.velocity0;
     //
 
     // WRITE THIS!
@@ -111,7 +113,8 @@ class Mass {
      * Take a snapshot of the particle's state, its position and
      * velocity, before advancing it.
      */
-    // WRITE THIS!
+    this.lastPosition = this.position;
+    this.lastVelocity = this.velocity;
   }
 
   computeAcceleration() {
@@ -127,9 +130,18 @@ class Mass {
      *    accel = (sum of the forces) / mass
      */
 
-    let force = new Vector3d(0.0, 0.0, 0.0);
+    const gravityForce = new Vector3d(0.0, -gGravity * this.mass, 0.0); // TODO: is this the right basis?
+    const breezeForce = new Vector3d(0.0, 0.0, 0.0); // TODO
+    const dragForce = this.lastVelocity.times(-gDrag);
 
-    // WRITE THIS!
+    const springForce = this.springs.reduce(
+      (forces, spring) => forces.plus(spring.computeForce(this)),
+      new Vector3d(0.0, 0.0, 0.0)
+    );
+
+    const force = gravityForce.plus(
+      breezeForce.plus(dragForce.plus(springForce))
+    );
 
     return force.times(1.0 / this.mass);
   }
@@ -141,7 +153,8 @@ class Mass {
      *
      * Use `timeStep` for the time step size.
      */
-    // WRITE THIS!
+    this.position = this.lastPosition.plus(this.lastVelocity.times(timeStep));
+    this.velocity = this.lastVelocity.plus(acceleration.times(timeStep));
   }
 
   makeStep() {
@@ -189,9 +202,13 @@ class Spring {
      * and the position of the other mass.
      */
 
-    // WRITE THIS!
+    const otherMass = onMass === this.mass1 ? this.mass2 : this.mass1;
 
-    return new Vector3d(0.0, 0.0, 0.0);
+    const distance = onMass.lastPosition.minus(otherMass.lastPosition);
+
+    return distance
+      .unit()
+      .times((distance.norm() - this.restingLength) * this.stiffness);
   }
 
   constrain() {
