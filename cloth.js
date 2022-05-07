@@ -47,7 +47,8 @@ let gFriction = 0.9;
 let gDrag = 0.9;
 let gStiffness = 5000.0;
 let gBend = 0.333;
-let gWind = 100.0;
+let gBreezeStrength = 100.0;
+let gBreezeNoise = 10.0;
 
 // Simulation state.
 //
@@ -115,7 +116,7 @@ class Mass {
     this.secondLastPosition = this.lastPosition;
   }
 
-  computeAcceleration() {
+  computeAcceleration(globalBreezeStrength) {
     /*
      * Compute the acceleration of this particle.
      * It results from the forces due to
@@ -130,11 +131,18 @@ class Mass {
 
     const gravityForce = new Vector3d(0.0, -gGravity * this.mass, 0.0);
 
-    // TODO: better breeze
-    const localBreezeConst = this.lastPosition
+    const distanceFromOrigin = this.lastPosition
       .minus(new Point3d(0.0, 0.0, 0.0))
       .norm();
-    const breezeForce = new Vector3d(0.0, 0.0, localBreezeConst * gWind);
+    const localBreezeAdjustment =
+      1 / (1 + distanceFromOrigin * distanceFromOrigin);
+    const breezeNoise = (Math.random() - 0.5) * gBreezeNoise;
+
+    const breezeForce = new Vector3d(
+      0.0,
+      0.0,
+      globalBreezeStrength * localBreezeAdjustment + breezeNoise
+    );
 
     const velocity = this.lastPosition.minus(this.secondLastPosition);
     const dragForce = velocity.times(-gDrag);
@@ -165,12 +173,12 @@ class Mass {
       .plus(acceleration.times(timeStep * timeStep));
   }
 
-  makeStep() {
+  makeStep(breeze) {
     /*
      * Computes the particle's next state based on its current one.
      */
     if (!this.fixed) {
-      const acceleration = this.computeAcceleration();
+      const acceleration = this.computeAcceleration(breeze);
       this.computeStep(gTimeStep, acceleration);
     }
   }
@@ -267,6 +275,7 @@ class Cloth {
     this.springs = [];
     //
     this.doFlap = false;
+    this.time = 0; // stored to compute sinusoidal breeze
 
     // Position all the particles.
     //
@@ -285,15 +294,16 @@ class Cloth {
     this.getMass(0, 0).fixed = true;
     this.getMass(0, this.columns - 1).fixed = true;
 
-    // fix the other two corners too, I think it looks better
-    this.getMass(this.rows - 1, 0).fixed = true;
-    this.getMass(this.rows - 1, this.columns - 1).fixed = true;
+    // // fix the other two corners too, I think it looks better
+    // this.getMass(this.rows - 1, 0).fixed = true;
+    // this.getMass(this.rows - 1, this.columns - 1).fixed = true;
   }
 
   reset() {
     /*
      * Reset the state of all the particles.
      */
+    this.time = 0;
     for (let mass of this.masses) {
       mass.reset();
     }
@@ -328,6 +338,7 @@ class Cloth {
      * Update the positions of the cloth's particles, computing
      * one time step forward.
      */
+    this.time++;
 
     // Save the current particle states, prepare for their update.
     //
@@ -342,10 +353,12 @@ class Cloth {
       this.doFlap = false;
     }
 
+    // const breeze = (Math.sin(this.time / 10) * 0.5 + 0.5) * gBreezeStrength;
+    const breeze = gBreezeStrength;
     // Change all the positions of each particle.
     //
     for (let mass of this.masses) {
-      mass.makeStep();
+      mass.makeStep(breeze);
     }
 
     // Correct overly-stretched springs.
@@ -575,6 +588,7 @@ class Cloth {
 
         // flexion springs
         if (!lastRow && !secondToLastRow) {
+          console.log("A");
           // make horizontal flexion spring
           const newSpring = new Spring(
             thisMass,
@@ -584,6 +598,7 @@ class Cloth {
           this.springs.push(newSpring);
         }
         if (!lastCol && !secondToLastCol) {
+          console.log("B");
           // make vertical flexion spring
           const newSpring = new Spring(
             thisMass,
