@@ -131,18 +131,23 @@ class Mass {
 
     const gravityForce = new Vector3d(0.0, -gGravity * this.mass, 0.0);
 
-    const distanceFromOrigin = this.lastPosition
-      .minus(new Point3d(0.0, 0.0, 0.0))
-      .norm();
-    const localBreezeAdjustment =
-      1 / (1 + distanceFromOrigin * distanceFromOrigin);
-    const breezeNoise = (Math.random() - 0.5) * gBreezeNoise;
 
-    const breezeForce = new Vector3d(
-      0.0,
-      0.0,
-      globalBreezeStrength * localBreezeAdjustment + breezeNoise
-    );
+		let breezeForce = new Vector3d(
+			0.0,
+			0.0,
+			0.0
+		);
+		if (gWindOn) {
+			console.assert(gWindOn);
+			console.log("A");
+			const distanceFromOrigin = this.lastPosition
+				.minus(new Point3d(0.0, 0.0, 0.0))
+				.norm();
+			const localBreezeAdjustment =
+				1 / (1 + distanceFromOrigin * distanceFromOrigin);
+			const breezeNoise = (Math.random() - 0.5) * gBreezeNoise;
+			breezeForce.dz = globalBreezeStrength * localBreezeAdjustment + breezeNoise;
+		}
 
     const velocity = this.lastPosition.minus(this.secondLastPosition);
     const dragForce = velocity.times(-gDrag);
@@ -588,7 +593,6 @@ class Cloth {
 
         // flexion springs
         if (!lastRow && !secondToLastRow) {
-          console.log("A");
           // make horizontal flexion spring
           const newSpring = new Spring(
             thisMass,
@@ -598,7 +602,6 @@ class Cloth {
           this.springs.push(newSpring);
         }
         if (!lastCol && !secondToLastCol) {
-          console.log("B");
           // make vertical flexion spring
           const newSpring = new Spring(
             thisMass,
